@@ -1,0 +1,3 @@
+add_executable(performance_graph)
+target_sources(performance_graph PRIVATE performance_graph.cpp)
+target_link_libraries(performance_graph HbbJetPrunPlots ${ROOT_LIBRARIES})
