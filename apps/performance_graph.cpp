@@ -15,17 +15,30 @@
 #include "TLatex.h"
 #include "TROOT.h"
 
+// Script usage function
+void usage() {
+  std::cout << "From the build/ directory:\n\n" << "./apps/performance_graph path-to-input-file path-to-output-file\n\n";
+}
+
 int main(int argc, char **argv) {
 
-  // Parse arguments
-  std::string ifileName = argv[1];
-  std::string ofileName = argv[2];
-
+  std::string input_name;
+  std::string output_name;
   std::vector<Record> records;
+
+  // Parse arguments
+  if (argc != 3) {
+    usage();
+    exit(1);
+  }
+  else {
+    input_name  = argv[1];
+    output_name = argv[2];
+  }
 
   // Open input file
   std::ifstream input;
-  input.open(ifileName.c_str(), std::ifstream::in);
+  input.open(input_name.c_str(), std::ifstream::in);
 
   // Read data from input file
   if (input.is_open()) {
@@ -41,7 +54,7 @@ int main(int argc, char **argv) {
     }
   }
   else {
-    std::cerr << "ERROR: cannot open input file with name " << ifileName << "." << std::endl;
+    std::cerr << "ERROR: cannot open input file with name " << input_name << "." << std::endl;
     exit(1);
   }
 
@@ -81,6 +94,5 @@ int main(int argc, char **argv) {
   g->GetYaxis()->SetTitle("CPU Time (hours)");
   g->Draw("alp");
   leg->Draw();
-  canv->SaveAs(ofileName.c_str());
-
+  canv->SaveAs(output_name.c_str());
 }
