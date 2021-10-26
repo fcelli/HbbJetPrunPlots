@@ -14,10 +14,12 @@
 #include "TAxis.h"
 #include "TLatex.h"
 #include "TROOT.h"
+#include "TStyle.h"
+#include "TMultiGraph.h"
 
 // Script usage function
 void usage() {
-  std::cout << "From the build/ directory:\n\n" << "./apps/performance_graph path-to-input-file path-to-output-file\n\n";
+  std::cout << "From the build/ directory:\n\n./apps/performance_graph path-to-input-file path-to-output-file\n\n";
 }
 
 int main(int argc, char **argv) {
@@ -45,11 +47,13 @@ int main(int argc, char **argv) {
     std::string line;
     while (std::getline(input, line)) {
       std::stringstream ss(line);
-      std::string prun_level, np_num, cpu_time_m0;
+      std::string prun_level, np_num, cpu_time_m0, cpu_time_m1, cpu_time_m3;
       std::getline(ss, prun_level, ',');
       std::getline(ss, np_num, ',');
       std::getline(ss, cpu_time_m0, ',');
-      Record r(std::stof(prun_level), std::stoi(np_num), std::stof(cpu_time_m0));
+      std::getline(ss, cpu_time_m1, ',');
+      std::getline(ss, cpu_time_m3, ',');
+      Record r(std::stof(prun_level), std::stoi(np_num), std::stof(cpu_time_m0), std::stof(cpu_time_m1), std::stof(cpu_time_m3));
       records.push_back(r);
     }
   }
@@ -61,38 +65,57 @@ int main(int argc, char **argv) {
   // Sort in ascending order of NP number
   std::sort(records.begin(), records.end(), sort_NP_ascending);
 
-  // Create graph
+  // Create graphs
   int n = records.size();
   std::vector<float> x(n), y(n);
   std::transform(records.begin(), records.end(), x.begin(), [](Record r) -> float {return r.getNpNum();});
   std::transform(records.begin(), records.end(), y.begin(), [](Record r) -> float {return r.getCpuTimeM0h();});
-  TGraph *g = new TGraph(n, x.data(), y.data());
+  TGraph *g0 = new TGraph(n, x.data(), y.data());
+  std::transform(records.begin(), records.end(), y.begin(), [](Record r) -> float {return r.getCpuTimeM1h();});
+  TGraph *g1 = new TGraph(n, x.data(), y.data());
+  std::transform(records.begin(), records.end(), y.begin(), [](Record r) -> float {return r.getCpuTimeM3h();});
+  TGraph *g3 = new TGraph(n, x.data(), y.data());
+  std::vector<TGraph*> graphs = {g0, g1, g3};
+  std::vector<int> colors = {9, 30, 46};
+  std::vector<TString> legend_labels = {"Minos 0", "Minos 1", "Minos 3"};
+  
 
-  // Add labels to graph
-  for (std::size_t i = 0; i < n; ++i) {
-    std::string label = " " + to_string_with_precision(records[i].getPrunLev(), 1) + "%";
-    TLatex *latex = new TLatex(g->GetX()[i], g->GetY()[i], label.c_str());
-    latex->SetTextSize(0.035);
-    latex->SetTextAlign(13);
-    g->GetListOfFunctions()->Add(latex);
+  // Add labels to graphs
+  for (TGraph *g : graphs) {
+    for (std::size_t i = 0; i < n; ++i) {
+      std::string label = " " + to_string_with_precision(records[i].getPrunLev(), 1) + "%";
+      TLatex *latex = new TLatex(g->GetX()[i], g->GetY()[i], label.c_str());
+      latex->SetTextSize(0.03);
+      latex->SetTextAlign(13);
+      g->GetListOfFunctions()->Add(latex);
+    }
   }
-
-  // Create legend
-  TLegend *leg = new TLegend(0.20, 0.80, 0.35, 0.90);
-  leg->AddEntry(g, "minos 0", "lp");
   
   // Load ATLAS ROOT style
   gROOT->SetStyle("ATLAS");
+  gStyle->SetOptTitle(0);
 
-  // Draw graph
+  // Create legend
+  TLegend *leg = new TLegend(0.20, 0.75, 0.35, 0.90);
+
+  // Create TMultiGraph
+  TMultiGraph *mg = new TMultiGraph();
+  mg->SetTitle("title;Number of NPs;CPU Time (hours)");
+
+  for (std::size_t i = 0; i < graphs.size(); ++i) {
+    // Legend entry
+    leg->AddEntry(graphs[i], legend_labels[i], "lp");
+    // Graphical options
+    graphs[i]->SetLineColor(colors[i]);
+    graphs[i]->SetMarkerColor(colors[i]);
+    graphs[i]->SetMarkerStyle(20);
+    // Add to TMultiGraph
+    mg->Add(graphs[i]);
+  }
+
+  // Draw graphs
   TCanvas *canv = new TCanvas("canv", "canv", 800, 600);
-  g->SetLineColor(kBlue);
-  g->SetMarkerStyle(20);
-  g->SetMarkerColor(kBlue);
-  g->SetTitle("");
-  g->GetXaxis()->SetTitle("Number of NP");
-  g->GetYaxis()->SetTitle("CPU Time (hours)");
-  g->Draw("alp");
+  mg->Draw("alp");
   leg->Draw();
   canv->SaveAs(output_name.c_str());
 }
